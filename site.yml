@@ -1,0 +1,7 @@
+---
+
+- hosts: amazed
+  gather_facts: yes
+
+  roles: 
+    - bastionhost

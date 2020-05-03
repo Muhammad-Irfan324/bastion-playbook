@@ -1,0 +1,451 @@
+---
+# tasks file for create-vpc
+
+- name: create a VPC with default tenancy
+  ec2_vpc_net:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    name: custom_vpc
+    cidr_block: 10.0.0.0/16
+    dns_hostnames: yes
+    dns_support: yes
+    tenancy: default
+  register: ansibleVPC
+
+- name: vpc id Display
+  debug:
+    var: ansibleVPC.vpc.id 
+
+- name: create internet gateway       
+  ec2_vpc_igw:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    vpc_id: "{{ ansibleVPC.vpc.id }}"
+    state: "{{ state }}"
+    tags:
+      Name: IGW 
+  register: igw_result
+
+- name: IGW id Display
+  debug:
+    var: igw_result.gateway_id 
+
+
+- name: Create public subnet in us-east-1a zone
+  ec2_vpc_subnet:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    az: us-east-1a
+    state: "{{ state }}"
+    map_public: yes
+    vpc_id: "{{ ansibleVPC.vpc.id }}" 
+    cidr: 10.0.1.0/24
+    tags:
+      Name: Public_subnet_1
+  register: public_subnet_result
+
+
+- name: Public subnet id Display
+  debug:
+    var: public_subnet_result.subnet.id
+
+- name: Adding IGW in route table of subnet Public_subnet_1
+  ec2_vpc_route_table:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    vpc_id: "{{ ansibleVPC.vpc.id }}" 
+    state: "{{ state }}"
+    tags:
+        Name: Public_subnet_1_RT
+    subnets: "{{ public_subnet_result.subnet.id }}" 
+    routes:
+    - dest: "{{ destinationCidrBlock }}" 
+      gateway_id: "{{ igw_result.gateway_id }}"
+  register: public_route_table
+
+- name: Public route table id Display
+  debug:
+    var: public_route_table.route_table.id
+
+- name: Create private subnet for application server in us-east-1a zone
+  ec2_vpc_subnet:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    az: us-east-1a
+    state: "{{ state }}"
+    map_public: NO 
+    vpc_id: "{{ ansibleVPC.vpc.id }}" 
+    cidr: 10.0.4.0/24
+    tags:
+      Name: Private_subnet_APP
+  register: private_subnet_result
+
+- name: Private subnet id Display
+  debug:
+    var: private_subnet_result.subnet.id
+
+- name: Create new nat gateway and allocate new EIP.
+  ec2_vpc_nat_gateway:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    state: "{{ state }}"
+    subnet_id: "{{ public_subnet_result.subnet.id }}" 
+    wait: true
+    if_exist_do_not_create: true
+  register: new_nat_gateway
+
+- name: NGW id Display
+  debug:
+    var: new_nat_gateway.nat_gateway_id
+
+- name: Adding NAT Gateway in route table of subnet Private_subnet_APP
+  ec2_vpc_route_table:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    vpc_id: "{{ ansibleVPC.vpc.id }}" 
+    state: "{{ state }}"
+    tags:
+        Name: Private_subnet_APP_RT
+    subnets: "{{ private_subnet_result.subnet.id }}" 
+    routes:
+    - dest: "{{ destinationCidrBlock }}" 
+      nat_gateway_id: "{{ new_nat_gateway.nat_gateway_id }}"
+  register: private_route_table
+
+- name: Private route table App id Display
+  debug:
+    var: private_route_table.route_table.id
+
+- name: Create private subnet for Database server in us-east-1a zone (RDS required two zones subnet)
+  ec2_vpc_subnet:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    az: us-east-1a
+    state: "{{ state }}"
+    map_public: NO 
+    vpc_id: "{{ ansibleVPC.vpc.id }}" 
+    cidr: 10.0.7.0/24
+    tags:
+      Name: Private_subnet_DB1
+  register: private_subnet_result_DB1
+
+- name: Private subnet Databse1 id Display
+  debug:
+    var: private_subnet_result_DB1.subnet.id
+
+- name: Create private subnet for Database server in us-east-1b zone (RDS required two zones subnet)
+  ec2_vpc_subnet:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    az: us-east-1b
+    state: "{{ state }}"
+    map_public: NO 
+    vpc_id: "{{ ansibleVPC.vpc.id }}" 
+    cidr: 10.0.9.0/24
+    tags:
+      Name: Private_subnet_DB2
+  register: private_subnet_result_DB2
+
+- name: Private subnet Databse2 id Display
+  debug:
+    var: private_subnet_result_DB2.subnet.id
+
+- name: Route Table for Private subnet Databse1
+  ec2_vpc_route_table:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    vpc_id: "{{ ansibleVPC.vpc.id }}" 
+    state: "{{ state }}"
+    tags:
+        Name: Private_subnet_DB1_RT
+    subnets: "{{ private_subnet_result_DB1.subnet.id }}" 
+  register: private_route_table_DB1
+
+- name: Private route table id of DB1 Display
+  debug:
+    var: private_route_table_DB1.route_table.id
+
+
+
+- name: Route Table for Private subnet Databse2
+  ec2_vpc_route_table:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    vpc_id: "{{ ansibleVPC.vpc.id }}" 
+    state: "{{ state }}"
+    tags:
+        Name: Private_subnet_DB2_RT
+    subnets: "{{ private_subnet_result_DB2.subnet.id }}" 
+  register: private_route_table_DB2
+
+- name: Private route table id of DB2 Display
+  debug:
+    var: private_route_table_DB2.route_table.id
+
+
+- name: create ec2 Public subnet security group
+  ec2_group:
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_REGION }}'
+    vpc_id: "{{ ansibleVPC.vpc.id }}"
+    state: "{{ state }}"
+    name: "{{ security_group_name }}"
+    description: "{{ security_group_name }}"
+    tags:
+      Name: "{{ security_group_name  }}"
+    rules:
+    - proto: tcp
+      ports:
+      - 22
+      cidr_ip: "{{ port22CidrBlock }}"
+      rule_desc: allow all on port 22
+    - proto: tcp
+      ports:
+      - 80
+      cidr_ip: "{{ port80CidrBlock }}"
+      rule_desc: allow all on port 80
+    - proto: tcp
+      ports:
+      - 443
+      cidr_ip: "{{ port443CidrBlock }}"
+      rule_desc: allow all on port 443
+  register: sec_group 
+
+- name: security group ID for public host (Bastion)
+  debug:
+    var: sec_group.group_id
+
+- name: create ec2 private subnet security group
+  ec2_group:
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_REGION }}'
+    vpc_id: "{{ ansibleVPC.vpc.id }}"
+    state: "{{ state }}"
+    name: "{{ security_group_name_private }}"
+    description: "{{ security_group_name_private }}"
+    tags:
+      Name: "{{ security_group_name_private }}"
+    rules:
+    - proto: tcp
+      from_port: 22
+      to_port: 22
+      group_id: "{{ sec_group.group_id }}"
+      rule_desc: allow Bastion security group on port 22
+  register: priv_sec_group
+
+- name: security group ID for private app host
+  debug:
+    var: priv_sec_group.group_id
+
+- name: create RDS security group
+  ec2_group:
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_REGION }}'
+    vpc_id: "{{ ansibleVPC.vpc.id }}"
+    state: "{{ state }}"
+    name: "{{ security_group_name_db }}"
+    description: "{{ security_group_name_db }}"
+    tags:
+      Name: "{{ security_group_name_db }}"
+    rules:
+    - proto: tcp
+      from_port: 3306
+      to_port: 3306
+      group_name: "{{ priv_sec_group.group_name }}"
+      rule_desc: allow private instances to access databases
+  register: priv_sec_group_db
+
+
+- name: security group ID for private RDS host
+  debug:
+    var: priv_sec_group_db.group_id
+
+# - name: bastion host ec2 key generate
+#   ec2_key:
+#     aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+#     aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+#     region: '{{ AWS_REGION }}'
+#     name: bastion 
+#   register: ec2_key_result
+
+# - name: Save private key for bastion host 
+#   copy: content="{{ ec2_key_result.key.private_key }}" dest="/home/muhammad-irfan/Downloads/per/Ansible/bastion/bastion.pem" mode=0400
+#   when: ec2_key_result.changed
+
+# - name: private host ec2 key generate
+#   ec2_key:
+#     aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+#     aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+#     region: '{{ AWS_REGION }}'
+#     name: private_app  
+#   register: ec2_key_result_priv
+
+# - name: Save private key fro private instacnes 
+#   copy: content="{{ ec2_key_result_priv.key.private_key }}" dest="/home/muhammad-irfan/Downloads/per/Ansible/bastion/private_app.pem" mode=0400
+#   when: ec2_key_result_priv.changed
+
+# - name: Provision Bastion/Jumpbox instance
+#   ec2:
+#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+#     ec2_region: "{{ AWS_REGION }}"
+#     instance_type: t3.small
+#     keypair: bastion
+#     image: ami-085925f297f89fce1 #ubuntu 18
+#     assign_public_ip: yes
+#     termination_protection: yes
+#     vpc_subnet_id: "{{ public_subnet_result.subnet.id }}"
+#     group: "{{ security_group_name }}"
+#     wait: true
+#     exact_count: 1
+#     count_tag: 
+#       Name: Bastion
+#     volumes:
+#       - device_name: /dev/sda1
+#         volume_type: gp2
+#         volume_size: 10
+#         delete_on_termination: true
+#     instance_tags:
+#       Name: Bastion
+#   register: ec2instance
+
+# - name: Get Bastion instance id
+#   ec2_instance_info:
+#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+#     ec2_region: "{{ AWS_REGION }}"
+#     filters: 
+#       tag:Name: Bastion
+#   register: ec2_facts
+
+# - name: Debug ID
+#   debug:
+#     msg: 
+#       - Instance ID {{ item.0 }}
+#   with_together:
+#     - "{{ ec2_facts.instances[0].instance_id }}"
+
+# - name: Allocating elastic IP to Bastion instance
+#   ec2_eip:
+#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+#     ec2_region: "{{ AWS_REGION }}"
+#     in_vpc: yes
+#     reuse_existing_ip_allowed: yes
+#     state: present
+#     device_id: "{{ ec2_facts.instances[0].instance_id }}"
+#   register: instance_eip
+
+# - name: Display EIP of Bastion 
+#   debug:
+#     var: instance_eip.public_ip
+
+
+# - name: Provision private App01 Instance 
+#   ec2:
+#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+#     ec2_region: "{{ AWS_REGION }}"
+#     instance_type: t3.small
+#     keypair: private_app
+#     image: ami-085925f297f89fce1 #ubuntu 18
+#     #assign_public_ip: no 
+#     termination_protection: yes
+#     vpc_subnet_id: "{{ private_subnet_result.subnet.id }}"
+#     group: "{{ security_group_name_private }}"
+#     wait: true
+#     exact_count: 1
+#     count_tag: 
+#       Name: Private-App01
+#     volumes:
+#       - device_name: /dev/sda1
+#         volume_type: gp2
+#         volume_size: 10
+#         delete_on_termination: true
+#     instance_tags:
+#       Name: Private-App01
+#   register: ec2app01
+
+# - name: Provision private App02 Instance 
+#   ec2:
+#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+#     ec2_region: "{{ AWS_REGION }}"
+#     instance_type: t3.small
+#     keypair: private_app
+#     image: ami-085925f297f89fce1 #ubuntu 18
+#     #assign_public_ip: no 
+#     termination_protection: yes
+#     vpc_subnet_id: "{{ private_subnet_result.subnet.id }}"
+#     group: "{{ security_group_name_private }}"
+#     wait: true
+#     exact_count: 1
+#     count_tag: 
+#       Name: Private-App02
+#     volumes:
+#       - device_name: /dev/sda1
+#         volume_type: gp2
+#         volume_size: 10
+#         delete_on_termination: true
+#     instance_tags:
+#       Name: Private-App02
+#   register: ec2app02
+
+
+- name: Create RDS_SUBNET_GROUP
+  rds_subnet_group:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    state: "{{ state }}"
+    name: DB-SUBNET-GROUP
+    description: DB-SUBNET-GROUP
+    subnets:
+      - "{{ private_subnet_result_DB1.subnet.id }}"
+      - "{{ private_subnet_result_DB2.subnet.id }}"
+  register: dbsubnet
+
+- name: debug subnet group 
+  debug:
+    var: dbsubnet.subnet_group.name
+
+- name: CREATE RDS INSTANCE 
+  rds:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    command: create
+    instance_name: new-database
+    db_engine: MySQL
+    engine_version: 8.0.17
+    size: 20
+    force_failover: no
+    backup_retention: 7
+    backup_window: 18:00-20:30
+    zone: us-east-1a
+    subnet: "{{ dbsubnet.subnet_group.name }}"
+    vpc_security_groups: "{{ priv_sec_group_db.group_id }}"
+    instance_type: db.t3.small
+    username: admin
+    password: 1nsecure
+    tags:
+      Environment: testing
+  register: database_rds
+
+- name: Register RDS endpoint
+  debug:
+    var: database_rds.instance.endpoint

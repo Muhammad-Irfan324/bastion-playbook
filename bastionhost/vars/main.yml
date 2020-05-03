@@ -1,0 +1,13 @@
+---
+# vars file for bastionhost
+AWS_ACCESS_KEY_ID:  AKIAZDVNYTSOPFPOESBF
+AWS_SECRET_ACCESS_KEY: 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
+AWS_REGION: us-east-1
+state: 'present'
+destinationCidrBlock: '0.0.0.0/0'
+security_group_name: Bastion Security Group
+security_group_name_private: Private Security Group
+security_group_name_db: RDS Security Group
+port22CidrBlock: '0.0.0.0/0'
+port80CidrBlock: '0.0.0.0/0'
+port443CidrBlock: '0.0.0.0/0'
