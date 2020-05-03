@@ -274,136 +274,136 @@
   debug:
     var: priv_sec_group_db.group_id
 
-# - name: bastion host ec2 key generate
-#   ec2_key:
-#     aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
-#     aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
-#     region: '{{ AWS_REGION }}'
-#     name: bastion 
-#   register: ec2_key_result
+- name: bastion host ec2 key generate
+  ec2_key:
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_REGION }}'
+    name: bastion 
+  register: ec2_key_result
 
-# - name: Save private key for bastion host 
-#   copy: content="{{ ec2_key_result.key.private_key }}" dest="/home/muhammad-irfan/Downloads/per/Ansible/bastion/bastion.pem" mode=0400
-#   when: ec2_key_result.changed
+- name: Save private key for bastion host 
+  copy: content="{{ ec2_key_result.key.private_key }}" dest="/home/muhammad-irfan/Downloads/per/Ansible/bastion/bastion.pem" mode=0400
+  when: ec2_key_result.changed
 
-# - name: private host ec2 key generate
-#   ec2_key:
-#     aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
-#     aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
-#     region: '{{ AWS_REGION }}'
-#     name: private_app  
-#   register: ec2_key_result_priv
+- name: private host ec2 key generate
+  ec2_key:
+    aws_access_key: '{{ AWS_ACCESS_KEY_ID }}'
+    aws_secret_key: '{{ AWS_SECRET_ACCESS_KEY }}'
+    region: '{{ AWS_REGION }}'
+    name: private_app  
+  register: ec2_key_result_priv
 
-# - name: Save private key fro private instacnes 
-#   copy: content="{{ ec2_key_result_priv.key.private_key }}" dest="/home/muhammad-irfan/Downloads/per/Ansible/bastion/private_app.pem" mode=0400
-#   when: ec2_key_result_priv.changed
+- name: Save private key fro private instacnes 
+  copy: content="{{ ec2_key_result_priv.key.private_key }}" dest="/home/muhammad-irfan/Downloads/per/Ansible/bastion/private_app.pem" mode=0400
+  when: ec2_key_result_priv.changed
 
-# - name: Provision Bastion/Jumpbox instance
-#   ec2:
-#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
-#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
-#     ec2_region: "{{ AWS_REGION }}"
-#     instance_type: t3.small
-#     keypair: bastion
-#     image: ami-085925f297f89fce1 #ubuntu 18
-#     assign_public_ip: yes
-#     termination_protection: yes
-#     vpc_subnet_id: "{{ public_subnet_result.subnet.id }}"
-#     group: "{{ security_group_name }}"
-#     wait: true
-#     exact_count: 1
-#     count_tag: 
-#       Name: Bastion
-#     volumes:
-#       - device_name: /dev/sda1
-#         volume_type: gp2
-#         volume_size: 10
-#         delete_on_termination: true
-#     instance_tags:
-#       Name: Bastion
-#   register: ec2instance
+- name: Provision Bastion/Jumpbox instance
+  ec2:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    instance_type: t3.small
+    keypair: bastion
+    image: ami-085925f297f89fce1 #ubuntu 18
+    assign_public_ip: yes
+    termination_protection: yes
+    vpc_subnet_id: "{{ public_subnet_result.subnet.id }}"
+    group: "{{ security_group_name }}"
+    wait: true
+    exact_count: 1
+    count_tag: 
+      Name: Bastion
+    volumes:
+      - device_name: /dev/sda1
+        volume_type: gp2
+        volume_size: 10
+        delete_on_termination: true
+    instance_tags:
+      Name: Bastion
+  register: ec2instance
 
-# - name: Get Bastion instance id
-#   ec2_instance_info:
-#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
-#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
-#     ec2_region: "{{ AWS_REGION }}"
-#     filters: 
-#       tag:Name: Bastion
-#   register: ec2_facts
+- name: Get Bastion instance id
+  ec2_instance_info:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    filters: 
+      tag:Name: Bastion
+  register: ec2_facts
 
-# - name: Debug ID
-#   debug:
-#     msg: 
-#       - Instance ID {{ item.0 }}
-#   with_together:
-#     - "{{ ec2_facts.instances[0].instance_id }}"
+- name: Debug ID
+  debug:
+    msg: 
+      - Instance ID {{ item.0 }}
+  with_together:
+    - "{{ ec2_facts.instances[0].instance_id }}"
 
-# - name: Allocating elastic IP to Bastion instance
-#   ec2_eip:
-#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
-#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
-#     ec2_region: "{{ AWS_REGION }}"
-#     in_vpc: yes
-#     reuse_existing_ip_allowed: yes
-#     state: present
-#     device_id: "{{ ec2_facts.instances[0].instance_id }}"
-#   register: instance_eip
+- name: Allocating elastic IP to Bastion instance
+  ec2_eip:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    in_vpc: yes
+    reuse_existing_ip_allowed: yes
+    state: present
+    device_id: "{{ ec2_facts.instances[0].instance_id }}"
+  register: instance_eip
 
-# - name: Display EIP of Bastion 
-#   debug:
-#     var: instance_eip.public_ip
+- name: Display EIP of Bastion 
+  debug:
+    var: instance_eip.public_ip
 
 
-# - name: Provision private App01 Instance 
-#   ec2:
-#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
-#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
-#     ec2_region: "{{ AWS_REGION }}"
-#     instance_type: t3.small
-#     keypair: private_app
-#     image: ami-085925f297f89fce1 #ubuntu 18
-#     #assign_public_ip: no 
-#     termination_protection: yes
-#     vpc_subnet_id: "{{ private_subnet_result.subnet.id }}"
-#     group: "{{ security_group_name_private }}"
-#     wait: true
-#     exact_count: 1
-#     count_tag: 
-#       Name: Private-App01
-#     volumes:
-#       - device_name: /dev/sda1
-#         volume_type: gp2
-#         volume_size: 10
-#         delete_on_termination: true
-#     instance_tags:
-#       Name: Private-App01
-#   register: ec2app01
+- name: Provision private App01 Instance 
+  ec2:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    instance_type: t3.small
+    keypair: private_app
+    image: ami-085925f297f89fce1 #ubuntu 18
+    #assign_public_ip: no 
+    termination_protection: yes
+    vpc_subnet_id: "{{ private_subnet_result.subnet.id }}"
+    group: "{{ security_group_name_private }}"
+    wait: true
+    exact_count: 1
+    count_tag: 
+      Name: Private-App01
+    volumes:
+      - device_name: /dev/sda1
+        volume_type: gp2
+        volume_size: 10
+        delete_on_termination: true
+    instance_tags:
+      Name: Private-App01
+  register: ec2app01
 
-# - name: Provision private App02 Instance 
-#   ec2:
-#     aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
-#     aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
-#     ec2_region: "{{ AWS_REGION }}"
-#     instance_type: t3.small
-#     keypair: private_app
-#     image: ami-085925f297f89fce1 #ubuntu 18
-#     #assign_public_ip: no 
-#     termination_protection: yes
-#     vpc_subnet_id: "{{ private_subnet_result.subnet.id }}"
-#     group: "{{ security_group_name_private }}"
-#     wait: true
-#     exact_count: 1
-#     count_tag: 
-#       Name: Private-App02
-#     volumes:
-#       - device_name: /dev/sda1
-#         volume_type: gp2
-#         volume_size: 10
-#         delete_on_termination: true
-#     instance_tags:
-#       Name: Private-App02
-#   register: ec2app02
+- name: Provision private App02 Instance 
+  ec2:
+    aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+    aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+    ec2_region: "{{ AWS_REGION }}"
+    instance_type: t3.small
+    keypair: private_app
+    image: ami-085925f297f89fce1 #ubuntu 18
+    #assign_public_ip: no 
+    termination_protection: yes
+    vpc_subnet_id: "{{ private_subnet_result.subnet.id }}"
+    group: "{{ security_group_name_private }}"
+    wait: true
+    exact_count: 1
+    count_tag: 
+      Name: Private-App02
+    volumes:
+      - device_name: /dev/sda1
+        volume_type: gp2
+        volume_size: 10
+        delete_on_termination: true
+    instance_tags:
+      Name: Private-App02
+  register: ec2app02
 
 
 - name: Create RDS_SUBNET_GROUP
