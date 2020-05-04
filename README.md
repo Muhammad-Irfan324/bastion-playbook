@@ -1,7 +1,7 @@
 # bastion-playbook
 Ansible Playbook for creating Bastion Architecture on AWS
 
-Prerequsites
+Prerequisites
 
 - Ansbible playbook is written in version "2.9.7"
 - Needs to install python boto library in order to interact with AWS
